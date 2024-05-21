@@ -35,11 +35,6 @@ public class User implements UserDetails {
     @Column(name = "updated_at", columnDefinition = "DATETIME")
     private Date updatedAt;
 
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
-    }
-
     public void setId(long id) {
         this.id = id;
     }
@@ -86,6 +81,11 @@ public class User implements UserDetails {
 
     public Date getUpdatedAt() {
         return updatedAt;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of();
     }
 
     @Override

@@ -1,14 +1,11 @@
 package com.example.restapi.api.controllers;
 
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,85 +13,70 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.restapi.api.exceptions.ResourceNotFoundException;
 import com.example.restapi.api.models.User;
 import com.example.restapi.api.repositories.UserRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 public class UserController {
 
     @Autowired
     private UserRepository userRepository;
+    private final BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
 
     @GetMapping(value = "/list/users")
     public List<User> getUsers() {
-        return userRepository.findAll();
+        List<User> users = userRepository.findAll();
+
+        for (User user : users) {
+            user.setPassword(null);
+        }
+
+        return users;
     }
 
     @GetMapping(value = "/detail/users/{id}")
-    public User findUser(@PathVariable long id) {
-        return userRepository.findById(id).get();
+    public ResponseEntity<User> findUser(@PathVariable long id) {
+        User userOptional = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found" + id));
+
+        return ResponseEntity.ok(userOptional);
     }
 
     @PostMapping(value = "/register/user")
-    public String saveUser(@RequestBody User user) {
-        try {
-            User createUser = userRepository.save(user);
+    public ResponseEntity<String> saveUser(@RequestBody User user) {
+        String encryptedPassword = bCryptPasswordEncoder.encode(user.getPassword());
+        user.setPassword(encryptedPassword);
 
-            Map<String, Object> result = new HashMap<>();
-            result.put("status", "OK");
-            result.put("message", "");
-            result.put("result", createUser);
+        userRepository.save(user);
 
-            ObjectMapper objectMapper = new ObjectMapper();
-            String jsonResult = objectMapper.writeValueAsString(result);
-
-            return jsonResult;
-        } catch (JsonProcessingException e) {
-            return "Error.." + e;
-        }
-
+        return ResponseEntity.ok("Register user is successfully.");
     }
 
     @PostMapping(value = "/update/user")
-    public String updateUser(@RequestBody User user) {
-        try {
-            long id = user.getId();
-            User updatedUser = userRepository.findById(id).get();
-            ZoneId zoneId = ZoneId.of("Asia/Jakarta");
-            LocalDateTime now = LocalDateTime.now(zoneId);
-            Date updatedAt = Date.from(now.atZone(zoneId).toInstant());
+    public ResponseEntity<String> updateUser(@RequestBody User user) {
+        long id = user.getId();
+        User updatedUser = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found:" + id));
 
-            updatedUser.setUsername(user.getUsername());
-            updatedUser.setPassword(user.getPassword());
-            updatedUser.setEmail(user.getEmail());
-            updatedUser.setUpdatedAt(updatedAt);
+        updatedUser.setUsername(user.getUsername());
+        updatedUser.setPassword(user.getPassword());
+        updatedUser.setEmail(user.getEmail());
+        updatedUser.setUpdatedAt(new Date());
 
-            userRepository.save(updatedUser);
+        userRepository.save(updatedUser);
 
-            Map<String, String> result = new HashMap<>();
-            result.put("status", "OK");
-            result.put("message", "Updated successfully.");
-            result.put("result", "{}");
+        return ResponseEntity.ok("User updated successfully");
 
-            ObjectMapper objectMapper = new ObjectMapper();
-            String jsonResult = objectMapper.writeValueAsString(result);
-
-            return jsonResult;
-
-        } catch (JsonProcessingException ex) {
-            return "Error" + ex;
-        }
     }
 
     @DeleteMapping(value = "/delete/user/{id}")
-    public String deleteUser(@PathVariable long id) {
-        User deletedUser = userRepository.findById(id).get();
+    public ResponseEntity<String> deleteUser(@PathVariable long id) {
+        User deletedUser = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found:" + id));
 
         userRepository.delete(deletedUser);
 
-        return "User deleted successfully.";
+        return ResponseEntity.ok("User deleted successfully.");
     }
 
 }
